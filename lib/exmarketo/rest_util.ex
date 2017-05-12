@@ -30,10 +30,9 @@ defmodule Exmarketo.RestUtil do
     |> Map.merge(%{access_token: client.access_token})
     |> URI.encode_query
 
-    HTTPoison.request(:get, endpoint() <> @rest_url <> "/" <> object <> ".json?" <> query, [], recv_timeout: timeout())
+    HTTPoison.get(request_url(object, query), [], [recv_timeout: timeout(), timeout: timeout()])
   end
 
-  defp timeout() do
-    Application.get_env(:exmarketo, :timeout, 15000)
-  end
+  defp request_url(object, query), do: endpoint() <> @rest_url <> "/" <> object <> ".json?" <> query
+  defp timeout(),                  do: Application.get_env(:exmarketo, :timeout, 15_000)
 end

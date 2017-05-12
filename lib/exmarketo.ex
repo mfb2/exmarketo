@@ -1,54 +1,88 @@
 defmodule Exmarketo do
+  alias Exmarketo.Client
+  alias Exmarketo.Communicator
+
   @moduledoc """
   Documentation for Exmarketo.
   """
 
-  alias Exmarketo.Client
-  import Exmarketo.RestUtil
-  require Logger
+  @doc """
+  Performs a single 'GET' request to the Marketo REST API.
 
+  Returns a map representing the JSON content returned from Marketo.
+
+  ## Arguments
+
+    * `client` - the Marketo client.
+
+    * `object` - Object to be requested from Marketo.
+
+    * `params` - Parameters to be provided to the API call.
+    Must conform to header parameters as dictated by the Marketo
+    REST API spec.
+
+  ## Examples
+
+      iex> Exmarketo.get(Exmarketo.Client.new(), "campaigns", %{})
+      %{result: %{...}}
+
+  """
   def get(%Client{} = client, object, params \\ %{}) do
-    client
-    |> get_json(object, params)
+    Communicator.get(client, object, params)
   end
 
-  @spec get_by_page(Client.t, String.t, pid, map) :: any
+  @doc """
+  Performs multiple 'GET' requests to the Marketo REST API.  Results
+  are sent back to the `pid` provided to the method via messaging.
+
+  The `pid` provided must conform to the Exmarketo.PageHandler callbacks.
+  A GenServer that can handle these callbacks may be a good place to start.
+
+  ## Arguments
+
+    * `client` - the Marketo client.
+
+    * `object` - Object to be requested from Marketo.
+
+    * `pid`    - Process ID of the `Exmarketo.PageHandler`-compliant handler
+    that will handle pages retrieved from Marketo.
+
+    * `params` - Parameters to be provided to the API call.
+    Must conform to header parameters as dictated by the Marketo
+    REST API spec.
+
+  ## Examples
+
+      iex> Exmarketo.get_by_page(Exmarketo.new(), "campaigns", pid, %{})
+      :ok
+
+  """
+  @spec get_by_page(Client.t, String.t, pid, map) :: :ok
   def get_by_page(%Client{} = client, object, pid, params \\ %{}) do
-    handle_get(client, object, pid, params)
+    Communicator.get_by_page(client, object, pid, params)
   end
 
-  defp handle_get(%Client{} = client, object, pid, params) do
-    client
-    |> get_json(object, params)
-    |> handle_response(client, object, pid)
-  end
+  @doc """
+  Performs multiple 'GET' requests to the Marketo REST API.  Method
+  returns all data retrieved from Marketo.  NOTE!  This should not
+  be called for large datasets as it may consume all available memory.
 
-  defp get_json(client, object, params) do
-    client
-    |> rest_get_request(object, params)
-    |> elem(1)
-    |> Map.get(:body)
-    |> Poison.decode!
-  end
+  ## Arguments
 
-  defp handle_response(%{"result" => results, "nextPageToken" => next_page_token}, client, object, pid) do
-    send(pid, {:has_more, results})
-    :timer.sleep(api_throttle_rate())
-    Logger.debug("Retrieving next page using token: #{inspect next_page_token}")
-    handle_get(client, object, pid, %{nextPageToken: next_page_token})
-  end
-  defp handle_response(%{"nextPageToken" => next_page_token}, client, "activities/pagingtoken", pid) do
-    Logger.debug("Retrieving next page using token: #{inspect next_page_token}")
-    handle_get(client, "activities", pid, %{nextPageToken: next_page_token, activityTypeIds: 12})
-  end
-  defp handle_response(%{"nextPageToken" => next_page_token}, client, object, pid) do
-    Logger.debug("Retrieving next page using token: #{inspect next_page_token}")
-    handle_get(client, object, pid, %{nextPageToken: next_page_token})
-  end
-  defp handle_response(%{"result" => results}, _client, object, pid) do
-    send(pid, {:last_result, results})
-    Logger.info("Retrieval complete for object: #{inspect object}")
-  end
+    * `client` - the Marketo client.
 
-  defp api_throttle_rate(), do: Application.get_env(:exmarketo, :api_throttle_rate, 250)
+    * `object` - Object to be requested from Marketo.
+
+    * `params` - Parameters to be provided to the API call.
+    Must conform to header parameters as dictated by the Marketo
+    REST API spec.
+
+  ## Examples
+      iex> Exmarketo.get_all(Exmarketo.Client.new(), "activities", %{nextPageToken: token})
+      %{result: %{...}, ...}
+  """
+  @spec get_all(Client.t, String.t, map) :: map
+  def get_all(%Client{} = client, object, params \\ %{}) do
+    Communicator.get_all(client, object, params)
+  end
 end
